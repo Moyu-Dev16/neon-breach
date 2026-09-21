@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "gameId": "NeonBreachGame",
+  "apiVersion": 1,
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "name": "NEON BREACH: CYBER-VAULT",
+      "description": "Original cyberpunk casino intrusion game. Breach the megacorp ICE vault across 4 security vectors with a verified 96.50% RTP."
+    }
+  },
+  "presentation": {
+    "mode": "full-iframe",
+    "hostPanels": {
+      "openSession": false,
+      "history": false,
+      "status": false
+    }
+  },
+  "capabilities": {
+    "openSession": true,
+    "submitAction": false,
+    "forfeitExpiredSession": false,
+    "cancelStuckRandomness": true,
+    "resize": true
+  }
+}
