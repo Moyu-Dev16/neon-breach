@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { INTRUSION_MODES, type IntrusionMode, type BreachOutcome, MODULO_BASE } from '../lib/math';
+import { soundFx } from '../lib/audio';
 
 interface BreachConsoleProps {
   mode: IntrusionMode;
@@ -7,6 +8,7 @@ interface BreachConsoleProps {
   outcome: BreachOutcome | null;
   payoutAmount: string;
   symbol: string;
+  heatLevel: number;
 }
 
 export const BreachConsole: React.FC<BreachConsoleProps> = ({
@@ -15,169 +17,257 @@ export const BreachConsole: React.FC<BreachConsoleProps> = ({
   outcome,
   payoutAmount,
   symbol,
+  heatLevel,
 }) => {
   const config = INTRUSION_MODES[mode];
   const [displayRoll, setDisplayRoll] = useState<number>(0);
+  const [hexSnippet, setHexSnippet] = useState<string>('0x00000000');
 
-  // Animated number scrambler during breaching status
+  // Animated scrambler during breaching status
   useEffect(() => {
     if (status !== 'breaching') {
       if (outcome) {
         setDisplayRoll(outcome.roll);
+        setHexSnippet(`0x${outcome.roll.toString(16).toUpperCase().padStart(8, '0')}`);
       }
       return;
     }
 
     const interval = setInterval(() => {
-      setDisplayRoll(Math.floor(Math.random() * MODULO_BASE));
+      const rand = Math.floor(Math.random() * MODULO_BASE);
+      setDisplayRoll(rand);
+      setHexSnippet(`0x${Math.floor(Math.random() * 0xffffffff).toString(16).toUpperCase().padStart(8, '0')}`);
+      soundFx.playDecryptTick();
     }, 45);
 
     return () => clearInterval(interval);
   }, [status, outcome]);
 
   const won = outcome?.won === true;
+  const isBreaching = status === 'breaching';
+  const isSettled = status === 'settled';
+
+  // Screen shake on lockdown
+  const isAlarm = isSettled && !won;
 
   return (
-    <div className="relative w-full rounded-2xl border border-cyan-500/30 bg-[#0a0e17] overflow-hidden p-4 sm:p-6 shadow-[inset_0_0_40px_rgba(6,182,212,0.06)]">
-      {/* Background Matrix Grid Scanline */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-15"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(6, 182, 212, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.25) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
-        }}
-      />
+    <div
+      className={`relative w-full rounded-2xl border-2 bg-[#060911] overflow-hidden p-4 sm:p-6 crt-screen transition-all ${
+        isAlarm
+          ? 'border-red-500/60 shadow-[0_0_50px_rgba(239,68,68,0.3)] shake-active'
+          : isSettled && won
+            ? 'border-emerald-400/60 shadow-[0_0_60px_rgba(16,185,129,0.35)]'
+            : 'border-cyan-500/30 shadow-[inset_0_0_50px_rgba(6,182,212,0.08)]'
+      }`}
+    >
+      {/* Industrial Bezel & Rivets */}
+      <div className="pointer-events-none absolute top-2 left-2 size-2 rounded-full bg-white/30 shadow-inner" />
+      <div className="pointer-events-none absolute top-2 right-2 size-2 rounded-full bg-white/30 shadow-inner" />
+      <div className="pointer-events-none absolute bottom-2 left-2 size-2 rounded-full bg-white/30 shadow-inner" />
+      <div className="pointer-events-none absolute bottom-2 right-2 size-2 rounded-full bg-white/30 shadow-inner" />
 
       {/* Top Console Bar */}
-      <div className="relative z-10 flex items-center justify-between pb-3 border-b border-white/10 mb-4 sm:mb-6">
+      <div className="relative z-10 flex flex-wrap items-center justify-between pb-3 border-b border-white/10 gap-2 mb-4">
         <div className="flex items-center gap-2">
-          <div className="size-2 rounded-full bg-cyan-400 animate-ping" />
-          <span className="font-mono text-xs uppercase tracking-widest text-white/70">
-            ICE FIREWALL TERMINAL • [TARGET_NODE: 0x9F_VAULT]
-          </span>
-        </div>
-        <div className="font-mono text-xs text-white/40">
-          ALGORITHM: <span className="text-cyan-400 font-bold">VRF-BLAKE32-EC</span>
-        </div>
-      </div>
-
-      {/* Main Breach Stage */}
-      <div className="relative z-10 min-h-[220px] sm:min-h-[260px] flex flex-col items-center justify-center text-center">
-        {status === 'idle' && (
-          <div className="flex flex-col items-center gap-3">
-            <div className="size-20 rounded-full border-2 border-dashed border-cyan-500/40 flex items-center justify-center animate-spin-slow">
-              <span className="text-2xl font-orbitron text-cyan-400">🛡️</span>
-            </div>
-            <div className="font-orbitron font-bold text-lg text-white/90">
-              TARGET ICE LOCKED
-            </div>
-            <p className="font-mono text-xs text-white/50 max-w-md">
-              Vector armed: <strong style={{ color: config.accentColor }}>{config.name}</strong>.
-              Requires VRF roll &lt; <strong className="text-cyan-300">{config.winThreshold}</strong> / {MODULO_BASE}.
-              Initiate breach to exploit firewall.
-            </p>
-          </div>
-        )}
-
-        {status === 'breaching' && (
-          <div className="flex flex-col items-center gap-4">
-            {/* Pulsing Quantum Core */}
-            <div className="relative size-24 rounded-full border-4 border-cyan-400/40 flex items-center justify-center animate-pulse">
-              <div
-                className="absolute inset-0 rounded-full animate-ping opacity-30"
-                style={{ backgroundColor: config.accentColor }}
-              />
-              <span className="font-orbitron font-black text-2xl text-cyan-300">
-                {displayRoll}
-              </span>
-            </div>
-            <div className="space-y-1">
-              <div className="font-orbitron font-extrabold text-lg text-cyan-300 animate-bounce tracking-wider">
-                DECRYPTING ICE SIGNALS...
-              </div>
-              <p className="font-mono text-xs text-white/60">
-                Awaiting On-Chain VRF randomness entropy fulfillment
-              </p>
-            </div>
-          </div>
-        )}
-
-        {status === 'settled' && outcome && (
-          <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
-            {won ? (
-              <>
-                <div
-                  className="size-24 rounded-full border-4 border-emerald-400 bg-emerald-950/40 flex items-center justify-center shadow-[0_0_35px_rgba(16,185,129,0.5)]"
-                >
-                  <span className="text-4xl">🔓</span>
-                </div>
-                <div>
-                  <div className="font-orbitron font-black text-2xl sm:text-3xl text-emerald-400 tracking-wider">
-                    ICE BREACH SUCCESSFUL!
-                  </div>
-                  <div className="font-orbitron font-extrabold text-xl text-white mt-1">
-                    +{payoutAmount} <span className="text-emerald-400">{symbol}</span>{' '}
-                    <span className="text-xs font-mono text-emerald-300 px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40">
-                      {config.multiplier.toFixed(2)}x PAYOUT
-                    </span>
-                  </div>
-                  <p className="font-mono text-xs text-white/50 mt-1">
-                    VRF Roll: <strong className="text-emerald-300">{outcome.roll}</strong> (Target: &lt; {outcome.threshold})
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="size-24 rounded-full border-4 border-rose-500/80 bg-rose-950/40 flex items-center justify-center shadow-[0_0_35px_rgba(244,63,94,0.4)]">
-                  <span className="text-4xl">🚨</span>
-                </div>
-                <div>
-                  <div className="font-orbitron font-black text-2xl text-rose-500 tracking-wider">
-                    FIREWALL LOCKDOWN!
-                  </div>
-                  <p className="font-mono text-xs text-rose-300/80 mt-1">
-                    ICE detected intrusion packet. Counter-measures triggered.
-                  </p>
-                  <p className="font-mono text-xs text-white/50 mt-1">
-                    VRF Roll: <strong className="text-rose-400">{outcome.roll}</strong> (Threshold was &lt; {outcome.threshold})
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Bottom Meter / Threshold Bar */}
-      <div className="relative z-10 mt-4 pt-4 border-t border-white/10">
-        <div className="flex items-center justify-between text-xs font-mono text-white/60 mb-1.5">
-          <span>0 (ZERO DETECT)</span>
-          <span className="text-cyan-400 font-bold">
-            THRESHOLD: {config.winThreshold} ({config.winProbabilityPercent.toFixed(2)}%)
-          </span>
-          <span>{MODULO_BASE} (MAX ICE)</span>
-        </div>
-        <div className="relative h-2.5 w-full rounded-full bg-[#151c28] overflow-hidden border border-white/10">
-          {/* Win Zone */}
           <div
-            className="absolute top-0 bottom-0 left-0 transition-all duration-300"
-            style={{
-              width: `${(config.winThreshold / MODULO_BASE) * 100}%`,
-              backgroundColor: config.accentColor,
-            }}
+            className={`size-2.5 rounded-full ${
+              isAlarm
+                ? 'bg-red-500 animate-ping'
+                : isBreaching
+                  ? 'bg-amber-400 animate-ping'
+                  : won && isSettled
+                    ? 'bg-emerald-400'
+                    : 'bg-cyan-400 animate-pulse'
+            }`}
           />
-          {/* Current / Result Marker */}
-          {outcome && (
-            <div
-              className={`absolute top-0 bottom-0 w-1.5 shadow-[0_0_10px_#fff] ${
-                won ? 'bg-white' : 'bg-rose-500'
-              }`}
+          <span className="font-mono text-xs uppercase tracking-widest text-white/80 font-bold flex items-center gap-2">
+            ARCADE DECK // {config.code}
+            <span
+              className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold"
               style={{
-                left: `${Math.min(100, Math.max(0, (outcome.roll / MODULO_BASE) * 100))}%`,
+                backgroundColor: `${config.accentColor}20`,
+                color: config.accentColor,
+                border: `1px solid ${config.accentColor}60`,
               }}
+            >
+              {config.name}
+            </span>
+          </span>
+        </div>
+
+        {/* Heat Level Visual Gauge */}
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <span className="text-white/40 text-[11px]">HEAT LVL:</span>
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4].map((lvl) => (
+              <div
+                key={lvl}
+                className={`h-2.5 w-4 rounded-xs transition-all ${
+                  lvl <= heatLevel
+                    ? lvl === 4
+                      ? 'bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]'
+                      : lvl === 3
+                        ? 'bg-amber-400 shadow-[0_0_6px_#f59e0b]'
+                        : lvl === 2
+                          ? 'bg-cyan-400 shadow-[0_0_6px_#06b6d4]'
+                          : 'bg-emerald-400'
+                    : 'bg-white/10'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Center Decryption Arena */}
+      <div className="relative z-10 min-h-[260px] sm:min-h-[300px] flex flex-col items-center justify-center text-center p-2">
+        {/* Dynamic Concentric Cipher Rings */}
+        <div className="relative size-44 sm:size-56 flex items-center justify-center mb-3">
+          {/* Outer Ring */}
+          <svg
+            className={`absolute inset-0 size-full ${
+              isBreaching ? 'animate-spin-fast' : 'animate-spin-slow'
+            }`}
+            viewBox="0 0 200 200"
+          >
+            <circle
+              cx="100"
+              cy="100"
+              r="92"
+              fill="none"
+              stroke={config.accentColor}
+              strokeWidth="2"
+              strokeDasharray="8 6 24 6 12 12"
+              opacity={isAlarm ? 0.3 : 0.65}
             />
+            <circle
+              cx="100"
+              cy="100"
+              r="85"
+              fill="none"
+              stroke="rgba(255,255,255,0.15)"
+              strokeWidth="1"
+            />
+          </svg>
+
+          {/* Middle Ring (Reverse Rotation) */}
+          <svg
+            className={`absolute inset-3 size-[calc(100%-24px)] ${
+              isBreaching ? 'animate-spin-fast' : 'animate-spin-reverse-slow'
+            }`}
+            viewBox="0 0 200 200"
+          >
+            <circle
+              cx="100"
+              cy="100"
+              r="76"
+              fill="none"
+              stroke={isAlarm ? '#ef4444' : '#06b6d4'}
+              strokeWidth="3"
+              strokeDasharray="4 8 16 8"
+              opacity="0.8"
+            />
+          </svg>
+
+          {/* Inner Quantum Core Display */}
+          <div
+            className={`relative size-28 sm:size-36 rounded-full border-2 flex flex-col items-center justify-center transition-all ${
+              isAlarm
+                ? 'border-red-500 bg-red-950/40'
+                : isSettled && won
+                  ? 'border-emerald-400 bg-emerald-950/50 glow-gold'
+                  : isBreaching
+                    ? 'border-cyan-300 bg-cyan-950/60 animate-pulse glow-cyan'
+                    : 'border-white/20 bg-[#0d1424]/80'
+            }`}
+          >
+            {/* Core Label */}
+            <span className="text-[10px] font-mono tracking-widest text-white/50 mb-0.5">
+              {isBreaching ? 'SCANNING' : isSettled ? (won ? 'CRACKED' : 'BLOCKED') : 'ENTROPY'}
+            </span>
+
+            {/* Core Number Roll */}
+            <span
+              className={`font-orbitron font-black text-2xl sm:text-3xl tracking-wider ${
+                isAlarm
+                  ? 'text-red-400'
+                  : isSettled && won
+                    ? 'text-emerald-300'
+                    : isBreaching
+                      ? 'text-cyan-300'
+                      : 'text-white/80'
+              }`}
+            >
+              {displayRoll}
+            </span>
+
+            {/* Threshold condition */}
+            <span className="text-[10px] font-mono text-white/40 mt-0.5">
+              REQ &lt; {config.winThreshold}
+            </span>
+          </div>
+        </div>
+
+        {/* Live Status Text Area */}
+        <div className="space-y-1 max-w-md">
+          {status === 'idle' && (
+            <>
+              <div className="font-orbitron font-bold text-base text-white/90">
+                ICE DEFENSE STATUS: ARMED
+              </div>
+              <p className="font-mono text-xs text-white/50">
+                Infiltration vector <strong style={{ color: config.accentColor }}>{config.name}</strong> ready.
+                Theoretical win rate: <strong className="text-cyan-300">{(config.winThreshold / MODULO_BASE * 100).toFixed(2)}%</strong> (96.50% RTP).
+              </p>
+            </>
           )}
+
+          {status === 'breaching' && (
+            <>
+              <div className="font-orbitron font-extrabold text-base text-cyan-300 tracking-wider flex items-center justify-center gap-2">
+                <span className="animate-spin">⚙️</span>
+                DECRYPTING CIPHER MATRIX...
+              </div>
+              <div className="font-mono text-xs text-cyan-400/80 bg-cyan-950/60 px-3 py-1 rounded border border-cyan-500/30">
+                ENTROPY HASH: {hexSnippet}
+              </div>
+            </>
+          )}
+
+          {isSettled && won && outcome && (
+            <div className="space-y-1.5 animate-fadeIn">
+              <div className="font-orbitron font-black text-xl text-emerald-400 flex items-center justify-center gap-2 tracking-wide">
+                <span>💥</span> BREACH CONFIRMED (+{payoutAmount} {symbol})
+              </div>
+              <div className="font-mono text-xs text-emerald-300/90 bg-emerald-950/70 py-1 px-3 rounded border border-emerald-500/40 inline-block">
+                ROLL {outcome.roll} &lt; THRESHOLD {outcome.threshold} • PAYOUT {outcome.multiplier.toFixed(2)}x
+              </div>
+            </div>
+          )}
+
+          {isSettled && !won && outcome && (
+            <div className="space-y-1.5 animate-fadeIn">
+              <div className="font-orbitron font-black text-xl text-red-400 flex items-center justify-center gap-2 tracking-wide">
+                <span>🚨</span> ICE LOCKDOWN TRIGGERED
+              </div>
+              <div className="font-mono text-xs text-red-300/90 bg-red-950/70 py-1 px-3 rounded border border-red-500/40 inline-block">
+                ROLL {outcome.roll} &ge; THRESHOLD {outcome.threshold} • INTRUSION NEUTRALIZED
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Technical Bar */}
+      <div className="relative z-10 flex flex-wrap items-center justify-between pt-3 border-t border-white/10 mt-4 text-[11px] font-mono text-white/40 gap-2">
+        <div>
+          MODULO SPACE: <span className="text-white/70">12,000 (EXACT)</span>
+        </div>
+        <div>
+          VERIFIED RTP: <span className="text-emerald-400 font-bold">96.5000%</span>
+        </div>
+        <div>
+          ENTROPY: <span className="text-cyan-400 font-bold">EVM VRF-BLAKE32</span>
         </div>
       </div>
     </div>
